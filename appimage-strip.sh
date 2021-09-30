@@ -60,20 +60,23 @@ cat $WORKDIR/required_files/*.txt | sed 's|//|/|g' | sort -u | cut -d/ -f 3- > a
 echo "INFO: Droping unused files"
 
 # drop only the files unique to bundled_file_list_sorted.txt
-DROP_LIST=$(comm -1 -3 accessed_files_sorted.txt bundled_file_list_sorted.txt)
-for FILE_PATH in $DROP_LIST; do
+rm $WORKDIR/dropped_files.txt
+for FILE_PATH in $(comm -1 -3 accessed_files_sorted.txt bundled_file_list_sorted.txt); do
     # don't drop symlinks they don't appear in the access log but are required
     if [ ! -L $FILE_PATH ] && [ ! -d $FILE_PATH ]; then
+        echo "$FILE_PATH" >> $WORKDIR/dropped_files.txt
         rm $FILE_PATH
-        echo $FILE_PATH > $WORKDIR/drpped_files.txt
     fi
 done
 
-echo "Testing resulting bundle"
-squashfs-root/AppRun
-if [ $? -eq 0 ]; then
-    echo "Re-pack the AppImage"
-    appimagetool squashfs-root
-else
+echo "Strip process completed!"
+echo "The list of dropped files can be found at: $WORKDIR/dropped_files.txt"
+
+echo "Testing the resulting AppDir"
+if [ ! squashfs-root/AppRun ]; then
     echo "ERROR: Something we just removed too many things. This tool needs a fix!"
+    exit 1
 fi
+
+echo "Re-pack the AppImage"
+appimagetool squashfs-root
